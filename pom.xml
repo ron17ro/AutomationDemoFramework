@@ -119,5 +119,12 @@
             <artifactId>extentreports</artifactId>
             <version>4.0.9</version>
         </dependency>
+        <!-- https://mvnrepository.com/artifact/net.sourceforge.plantuml/plantuml -->
+        <dependency>
+            <groupId>net.sourceforge.plantuml</groupId>
+            <artifactId>plantuml</artifactId>
+            <version>6703</version>
+        </dependency>
+
     </dependencies>
 </project>
