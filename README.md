@@ -618,7 +618,7 @@ public class Customer {
    }
 }
 ```
-A new line (testDataResourcePath) containing the JSON location will be added in Configuration.properties and a new method testDataResourcePath() will be creatd in the Config Reader class to read the new entry in the Configuation. properties file.
+A new line (testDataResourcePath) containing the JSON location will be added in Configuration.properties and a new method testDataResourcePath() will be creatd in the Config Reader class to read the new entry from the Configuation. properties file.
 Next, a JSON Reader class will be created using GSON, an opern source library which uses Java Reflection to provide simple methods to convert JSON to java.
 
 ### JsonDataReader.java ###
@@ -687,6 +687,7 @@ The CheckoutPage.java class will have a method to pass data from our JSON file
  select_County(customer.address.county); 
  }
  ```
+
 
 ## Test Runner ##
 
