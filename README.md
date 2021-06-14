@@ -665,7 +665,7 @@ public class JsonDataReader {
 }
 
 ```
-Our new data source will be mostly used in the CheckoutPage Steps file to pass Test Data to checkout Page Objects.
+Our new data source will be mostly used in the CheckoutPage Steps class to pass Test Data to checkout Page Objects.
 ```
 @When("^enter \\\"(.*)\\\" personal details on checkout page$")
 public void enter_personal_details_on_checkout_page(String customerName){
