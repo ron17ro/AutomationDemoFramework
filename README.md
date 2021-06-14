@@ -335,7 +335,6 @@ public class WebDriverManager {
 }
 ```
 
-
 ## Configuration Files ##
 
 ```
@@ -344,7 +343,7 @@ public class WebDriverManager {
 │       extent-config.xml
 ```
 
-Configuration.properties 
+### Configuration.properties ###
 ```
 environment=local
 browser=firefox
@@ -356,13 +355,171 @@ testDataResourcePath=src/test/resources/testDataResources/
 reportConfigPath=/configs/extent-config.xml
 ```
 
-### ConfigFileReader.class ### is used to read the configuration file. This will later be used in the StepDefinition classes to avoid code duplication.
+### ConfigFileReader.class ###
+This class is used to read the configuration file. This will later be used in the StepDefinition classes to avoid code duplication.
 Maintaining a single configuration file has the advantages of avoiding recompiling the project  
 ```
+package dataProvider;
 
+import enums.DriverType;
+import enums.EnvironmentType;
+
+import java.io.BufferedReader;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.IOException;
+import java.util.Properties;
+
+public class ConfigFileReader {
+
+    private Properties properties;
+    private final String propertyFilePath= "configs//Configuration.properties";
+
+
+    public ConfigFileReader(){
+        BufferedReader reader;
+        try {
+            reader = new BufferedReader(new FileReader(propertyFilePath));
+            properties = new Properties();
+            try {
+                properties.load(reader);
+                reader.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+            throw new RuntimeException("Configuration.properties not found at " + propertyFilePath);
+        }
+    }
+
+    public String getDriverPath(){
+        String driverPath = properties.getProperty("driverPath");
+        if(driverPath!= null) return driverPath;
+        else throw new RuntimeException("driverPath not specified in the Configuration.properties file.");
+    }
+
+    public long getImplicitlyWait() {
+        String implicitlyWait = properties.getProperty("implicitlyWait");
+        if(implicitlyWait != null) return Long.parseLong(implicitlyWait);
+        else throw new RuntimeException("implicitlyWait not specified in the Configuration.properties file.");
+    }
+
+    public String getApplicationUrl() {
+        String url = properties.getProperty("url");
+        if(url != null) return url;
+        else throw new RuntimeException("url not specified in the Configuration.properties file.");
+    }
+    public DriverType getBrowser() {
+        String browserName = properties.getProperty("browser");
+        if(browserName == null || browserName.equals("chrome")) return DriverType.CHROME;
+        else if(browserName.equalsIgnoreCase("firefox")) return DriverType.FIREFOX;
+        else if(browserName.equals("iexplorer")) return DriverType.INTERNETEXPLORER;
+        else throw new RuntimeException("Browser Name Key value in Configuration.properties is not matched : " + browserName);
+    }
+
+    public EnvironmentType getEnvironment() {
+        String environmentName = properties.getProperty("environment");
+        if(environmentName == null || environmentName.equalsIgnoreCase("local")) return EnvironmentType.LOCAL;
+        else if(environmentName.equals("remote")) return EnvironmentType.REMOTE;
+        else throw new RuntimeException("Environment Type Key value in Configuration.properties is not matched : " + environmentName);
+    }
+
+    public Boolean getBrowserWindowSize() {
+        String windowSize = properties.getProperty("windowMaximize");
+        if(windowSize != null) return Boolean.valueOf(windowSize);
+        return true;
+    }
+
+    public String getTestDataResourcePath(){
+        String testDataResourcePath = properties.getProperty("testDataResourcePath");
+        if(testDataResourcePath!= null) return testDataResourcePath;
+        else throw new RuntimeException("Test Data Resource Path not specified in the Configuration.properties file for the Key:testDataResourcePath");
+    }
+    public String getReportConfigPath(){
+        String reportConfigPath = properties.getProperty("reportConfigPath");
+        if(reportConfigPath!= null) return reportConfigPath;
+        else throw new RuntimeException("Report Config Path not specified in the Configuration.properties file for the Key:reportConfigPath");
+    }
+
+```
+## Test context sharing between Cucumber step definitions with Dependency Injection (DI) Containers using PicoContainer ##
+
+When steps become interconnected and interdependent, context sharing is required to execute scenario steps one after another. Keeeping all steps in a single file will become impractical, sharing objects between classes will be addresesed by a Test Context Manager.
+
+__What is PicoContainer?__
+It’s a tiny library written by Paul Hammant in 2003-2004. It is pretty awesome because it’s so little and simple:
+
+* PicoContainer doesn’t require any configuration
+* PicoContainer doesn’t require your classes to use any APIs such as the horrible @Inject – just use constructors
+* PicoContainer really only has a single feature – it instantiates objects
+
+Simply hand it some classes and it will instantiate each one, correctly wired together via their constructors. That’s it. Cucumber scans your classes with step definitions in them, passes them to PicoContainer, then asks it to create new instances for every scenario.
+
+### TestContext.java ###
+
+```
+package cucumber;
+ 
+import managers.PageObjectManager;
+import managers.WebDriverManager;
+ 
+public class TestContext {
+ private WebDriverManager webDriverManager;
+ private PageObjectManager pageObjectManager;
+ 
+ public TestContext(){
+ webDriverManager = new WebDriverManager();
+ pageObjectManager = new PageObjectManager(webDriverManager.getDriver());
+ }
+ 
+ public WebDriverManager getWebDriverManager() {
+ return webDriverManager;
+ }
+ 
+ public PageObjectManager getPageObjectManager() {
+ return pageObjectManager;
+ }
+ 
+}
 ```
 
 
+PicoContainer can create and inject an object in the step classes constructor. 
+
+### HomePageSteps.java ###
+```
+package stepDefinitions;
+ 
+import cucumber.TestContext;
+import cucumber.api.java.en.Given;
+import cucumber.api.java.en.When;
+import pageObjects.HomePage;
+ 
+public class HomePageSteps {
+ 
+ TestContext testContext;
+ HomePage homePage;
+ 
+ public HomePageSteps(TestContext context) {
+ testContext = context;
+ homePage = testContext.getPageObjectManager().getHomePage();
+ }
+ 
+ @Given("^user is on Home Page$")
+ public void user_is_on_Home_Page(){
+ homePage.navigateTo_HomePage(); 
+ }
+ 
+ @When("^he search for \"([^\"]*)\"$")
+ public void he_search_for(String product)  {
+ homePage.perform_Search(product);
+ }
+ 
+}
+```
+
+## Test Ruuner ##
 
 A [JUnit Test Runner](https://www.toolsqa.com/cucumber/junit-test-runner-class/) will be the starting point to executing all tests
 ```
