@@ -231,7 +231,7 @@ public class FileReaderManager {
 }
 ```
 
-### WebDriverManager.java ###
+### Web Driver Manager ###
 
 The only responsibility of the WebDriver Manager Factory is to get us the WebDriver, when required. To accomplish this we will be doing the below activities:
 
@@ -265,7 +265,7 @@ driverPath=src\\test\\resources\\geckodriver\\geckodriver.exe
 implicitlyWait=20
 url=http://shop.demoqa.com
 ```
-WebDriverManager.java
+### WebDriverManager.java ###
 ```
 import enums.DriverType;
 import enums.EnvironmentType;
@@ -485,7 +485,8 @@ public class TestContext {
 ```
 
 
-PicoContainer can create and inject an object in the step classes constructor. 
+PicoContainer can create and inject an object in the step classes constructor. For example, the Home Page Steps class will instantiate the TestContext object in the constructor, so the code to instantiate a WebDriverManager and PageObjectManager will no longer be required. 
+
 
 ### HomePageSteps.java ###
 ```
@@ -519,7 +520,175 @@ public class HomePageSteps {
 }
 ```
 
-## Test Ruuner ##
+## Data Driven Testing using Json with Cucumber ##
+
+[Data-Driven Testing](https://www.toolsqa.com/selenium-cucumber-framework/data-driven-testing-using-json-with-cucumber/) is a technique which allows test scripts to run using multiple values from external sources. For example a customer order, has many fields which can be difficult to test with many types of input. In this case, a data source provider will pass multiple set of values, even altered input variables to check for errors in the form.
+
+JSON has the advantage of not requiring additional dependencies like Excel which require MS Ofiice to be installed on the machine where the tests are ruuning. 
+Cucumber Examples and test cases are a good source of data for extracting Customer Details. 
+The new feature file will include variables that will use the new JSON Data Source. 
+
+Scenario Outline must be specified instead of Scenario in order to use placeholder which will use the new Data Source.
+```
+Feature: Automated End2End Tests
+Description: The purpose of this feature is to test End 2 End integration.
+ 
+Scenario Outline: Customer place an order by purchasing an item from search 
+ Given user is on Home Page
+ When he search for "dress"
+ And choose to buy the first item
+ And moves to checkout from mini cart
+ And enter "<customer>" personal details on checkout page
+ And select same delivery address
+ And select payment method as "check" payment
+ And place the order
+Examples:
+ |customer|
+ |Lakshay|
+ ```
+
+The JSON file which will be used with our End to End test will contain the following data:
+```
+[ 
+ {
+ "firstName": "Lakshay",
+ "lastName": "Sharma",
+ "age": 35,
+ "emailAddress": "Lakshay@Gmail.com",
+ "address": {
+ "streetAddress": "Shalimar Bagh",
+ "city": "Delhi",
+ "postCode": "110088",
+ "state": "Delhi",
+ "country": "India",
+ "county": "Delhi"
+ },
+ "phoneNumber": {
+ "home": "012345678",
+ "mob": "0987654321"
+ }
+ },
+ {
+ "firstName": "Virender",
+ "lastName": "Singh",
+ "age": 35,
+ "emailAddress": "Virender@Gmail.com",
+ "address": {
+ "streetAddress": "Palam Vihar",
+ "city": "Gurgaon",
+ "postCode": "122345",
+ "state": "Haryana",
+ "country": "India",
+ "county": "Delhi"
+ },
+ "phoneNumber": {
+ "home": "012345678",
+ "mob": "0987654321"
+ }
+ }
+]
+```
+This JSON file will be deserialized using a Java class object which will contain the arguments required to store the values in the JSON file.
+A POJO class will be constructed using the website http://www.jsonschema2pojo.org/
+
+### Customer.java ###
+```
+package testDataTypes;
+ 
+public class Customer {
+   public String firstName;
+   public String lastName;
+   public int age;
+   public String emailAddress;
+   public Address address;
+   public PhoneNumber phoneNumber; 
+   
+   public class Address {
+   public String streetAddress;
+   public String city;
+   public String postCode;
+   public String state;
+   public String country;
+   public String county;
+   }
+ 
+   public class PhoneNumber {
+   public String home;
+   public String mob;
+   }
+}
+```
+A new line (testDataResourcePath) containing the JSON location will be added in Configuration.properties and a new method testDataResourcePath() will be creatd in the Config Reader class to read the new entry in the Configuation. properties file.
+Next, a JSON Reader class will be created using GSON, an opern source library which uses Java Reflection to provide simple methods to convert JSON to java.
+
+### JsonDataReader.java ###
+```
+package dataProviders;
+	import java.io.BufferedReader;
+	import java.io.FileNotFoundException;
+	import java.io.FileReader;
+	import java.io.IOException;
+	import java.util.Arrays;
+	import java.util.List;
+	import com.google.gson.Gson;
+	import managers.FileReaderManager;
+	import testDataTypes.Customer;
+	
+public class JsonDataReader {
+	private final String customerFilePath = FileReaderManager.getInstance().getConfigReader().getTestDataResourcePath() + "Customer.json";
+	private List<Customer> customerList;
+	
+	public JsonDataReader(){
+		customerList = getCustomerData();
+	}
+	
+	private List<Customer> getCustomerData() {
+		Gson gson = new Gson();
+		BufferedReader bufferReader = null;
+		try {
+			bufferReader = new BufferedReader(new FileReader(customerFilePath));
+			Customer[] customers = gson.fromJson(bufferReader, Customer[].class);
+			return Arrays.asList(customers);
+		}catch(FileNotFoundException e) {
+			throw new RuntimeException("Json file not found at path : " + customerFilePath);
+		}finally {
+			try { if(bufferReader != null) bufferReader.close();}
+			catch (IOException ignore) {}
+		}
+	}
+		
+	public final Customer getCustomerByName(String customerName){
+			 return customerList.stream().filter(x -> x.firstName.equalsIgnoreCase(customerName)).findAny().get();
+	}
+	
+
+}
+
+```
+Our new data source will be mostly used in the CheckoutPage Steps file to pass Test Data to checkout Page Objects.
+```
+@When("^enter \\\"(.*)\\\" personal details on checkout page$")
+public void enter_personal_details_on_checkout_page(String customerName){
+ Customer customer = FileReaderManager.getInstance().getJsonReader().getCustomerByName(customerName);
+ checkoutPage.fill_PersonalDetails(customer); 
+}
+```
+The CheckoutPage.java class will have a method to pass data from our JSON file
+```
+ public void fill_PersonalDetails(Customer customer) {
+ enter_Name(customer.firstName);
+ enter_LastName(customer.lastName);
+ enter_Phone(customer.phoneNumber.mob);
+ enter_Email(customer.emailAddress);
+ enter_City(customer.address.city);
+ enter_Address(customer.address.streetAddress);
+ enter_PostCode(customer.address.postCode);
+ select_Country(customer.address.country);
+ select_County(customer.address.county); 
+ }
+ ```
+
+## Test Runner ##
 
 A [JUnit Test Runner](https://www.toolsqa.com/cucumber/junit-test-runner-class/) will be the starting point to executing all tests
 ```
